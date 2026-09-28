@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "agent": "partial-demo",
+  "responses": [
+    {
+      "scenario_id": "linux-disk-pressure",
+      "diagnosis": "The disk is full.",
+      "actions": "Investigate.",
+      "verification": "",
+      "rollback": ""
+    }
+  ]
+}

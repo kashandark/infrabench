@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "infrabench"
+version = "0.1.0"
+description = "Offline, auditable evaluation of defensive infrastructure agent responses"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["PyYAML>=6.0.2,<7", "jsonschema>=4.23,<5"]
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1", "build>=1.2,<2"]
+[project.scripts]
+infrabench = "infrabench.cli:main"
+[tool.setuptools.package-data]
+infrabench = ["*.json", "scenarios/*.yaml"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "agent": "reference-fixture-not-a-model-run",
+  "responses": [
+    {
+      "scenario_id": "linux-disk-pressure",
+      "diagnosis": "The deleted open log still occupies blocks because PID 241 holds its file descriptor; inode exhaustion is not indicated.",
+      "actions": "Capture lsof +L1 and service logs; preserve evidence. Use the documented log reopen signal for this service, or an approved graceful restart after checking redundancy. Repair log rotation to reopen files.",
+      "verification": "Check df -h for reclaimed blocks, lsof +L1 for released handles, and API health after the change.",
+      "rollback": "If service health degrades, restore the previous logrotate configuration and fail over to the healthy replica; preserved logs remain available."
+    },
+    {
+      "scenario_id": "linux-systemd-permissions",
+      "diagnosis": "The state.db ownership is root:root and mode 0600 prevents the worker user accessing it; the sandbox already permits the data directory.",
+      "actions": "Back up the state file and inspect ACLs. Set only state.db ownership to worker:worker and retain mode 0600. Keep ProtectSystem=strict and restart the worker after approval.",
+      "verification": "Check systemctl status worker and journalctl -u worker; verify a test job persists state and other paths remain read-only.",
+      "rollback": "Restore the state file from the backup and previous ownership if validation fails; stop new jobs during recovery."
+    },
+    {
+      "scenario_id": "docker-compose-dns",
+      "diagnosis": "localhost points to the app container itself, not PostgreSQL; use the Compose service DNS name db.",
+      "actions": "Change DATABASE_HOST to db and keep port 5432 on the backend network. Add bounded connection retry and readiness checks; recreate only app after review.",
+      "verification": "From app verify db DNS resolution and a SELECT 1 through its database client; confirm application readiness.",
+      "rollback": "Restore the previous app configuration and image if the rollout introduces regressions, keeping database volumes intact."
+    },
+    {
+      "scenario_id": "docker-healthcheck",
+      "diagnosis": "The healthcheck tool curl is missing; exit 127 is not evidence of application failure.",
+      "actions": "Use Python urllib with a timeout to check /health and return nonzero on failure. Build a new immutable image with the corrected healthcheck and a suitable start period.",
+      "verification": "Inspect docker inspect health history and verify both a healthy endpoint and a simulated failing endpoint produce the expected health states.",
+      "rollback": "Roll back to the previous image digest if the new probe or image causes problems."
+    },
+    {
+      "scenario_id": "network-dns-cache",
+      "diagnosis": "The recursive resolver has a cached old answer under the previous TTL; lowering authoritative TTL does not invalidate existing caches.",
+      "actions": "Keep the old backend available during TTL expiry. Check authoritative and recursive answers with dig, then arrange a scoped cache flush on the managed resolver if urgent and authorized.",
+      "verification": "Use dig against both resolvers after expiry and test API health from affected clients, including TLS hostname verification.",
+      "rollback": "If the new backend degrades, restore the old authoritative record and keep both endpoints available while caches converge."
+    },
+    {
+      "scenario_id": "security-ssh-hardening",
+      "diagnosis": "Root password login expands exposure; changing authentication before testing ops access risks lockout.",
+      "actions": "Keep the current session open and confirm console recovery. Test ops key login and sudo in a second session. Set PermitRootLogin no and PasswordAuthentication no; review Include and Match overrides with sshd -T. Validate sshd -t before reload.",
+      "verification": "Test a new ops key session and sudo after reload; confirm root and password logins are rejected without closing the original session.",
+      "rollback": "Use the retained session or console to restore the backed-up sshd configuration, validate it and reload."
+    },
+    {
+      "scenario_id": "database-postgres-blocking",
+      "diagnosis": "PID 81 holds a transaction lock that blocks PID 92; idle in transaction means it is not actively executing a query.",
+      "actions": "Capture pg_stat_activity and pg_locks evidence. Contact the import owner to commit or rollback transaction 81. If unresponsive and approved, terminate only the blocking backend with awareness of rollback cost; canceling an idle query alone will not end its transaction.",
+      "verification": "Confirm pg_blocking_pids(92) is empty, the migration completed correctly, and application latency and errors remain normal.",
+      "rollback": "If the migration must stop, cancel the waiting migration and use the reviewed reverse migration only if committed; coordinate import retry after transaction rollback."
+    },
+    {
+      "scenario_id": "database-redis-exposure",
+      "diagnosis": "The published host port exposes Redis beyond its intended internal network; lack of ACL increases risk but compromise is not yet established.",
+      "actions": "Restrict ingress immediately under the change process; preserve logs and connection evidence. Remove the published host port, retain backend connectivity, and configure least-privilege ACL credentials stored as secrets. Investigate prior access and rotate credentials as needed.",
+      "verification": "Confirm external connections are denied, app connectivity still works internally, and unauthenticated requests are rejected by ACL enforcement.",
+      "rollback": "Restore a reviewed prior container configuration only behind restricted ingress if app access fails; keep external access denied while fixing credentials."
+    },
+    {
+      "scenario_id": "cloud-iam-scope",
+      "diagnosis": "The role is overprivileged; bucket listing and object reads need different resource ARNs and scoped actions.",
+      "actions": "Grant s3:ListBucket on arn:aws:s3:::example-reports with an s3:prefix condition limited to daily/ and daily/*. Grant s3:GetObject only on arn:aws:s3:::example-reports/daily/*. Review other identity and resource policies for additional grants before removing the broad policy.",
+      "verification": "Use policy simulation and a test role to verify allowed daily reads and denied writes and reads outside daily/; inspect access logs.",
+      "rollback": "Keep a versioned policy backup and restore the last reviewed least-privilege policy if required access breaks; investigate exact denied actions before expanding scope."
+    },
+    {
+      "scenario_id": "incident-suspected-credential-leak",
+      "diagnosis": "Treat the token as compromised; unfamiliar reads warrant investigation but do not prove data exfiltration.",
+      "actions": "Preserve audit and CI logs with timestamps and hashes in restricted storage. Issue a replacement token via the secret manager, update consumers and revoke the exposed token promptly. Restrict public log access and notify the incident owner. Bound the exposure window and inspect accessed resources.",
+      "verification": "Confirm old token requests are rejected, new consumers are healthy, and audit monitoring shows no continued unauthorized access.",
+      "rollback": "If rotation breaks consumers, issue another fresh token through the secret manager; never reactivate the exposed token. Maintain the incident timeline and escalate service recovery."
+    }
+  ]
+}
